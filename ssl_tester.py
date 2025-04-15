@@ -31,7 +31,9 @@ def send2Splunk(event, splunk_config):
     token = os.getenv("HEC_TOKEN")
     # url = splunk_config[1].get("hec_url")
     # token = splunk_config[1].get("hec_token")
-    index = splunk_config[1].get("index")
+    index = splunk_config[1].get("index", "main")
+    source = splunk_config[1].get("source", "ssl_tester")
+    sourcetype = splunk_config[1].get("sourcetype", "ssl_tester:json")
     if not url or not token:
         logging.error("HEC URL or Token not found in config file")
         return None
@@ -42,8 +44,8 @@ def send2Splunk(event, splunk_config):
     payload = {
         "time": int(time.time()),
         "index": index,
-        "sourcetype": "_json",
-        "source": "ssl_tester",
+        "sourcetype": sourcetype,
+        "source": source,
         "host": "ssl_tester",
         "event": event,
     }
