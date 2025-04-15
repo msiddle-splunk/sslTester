@@ -1,0 +1,13 @@
+logging:
+    path: /tmp/
+
+splunk:
+    index: 'main'
+    source: ''
+    sourcetype: ''
+
+ssltester:
+    endpoints:
+        - endpoint: ''
+          port: 8080
+          annotation: 'Test'
