@@ -6,40 +6,22 @@ import requests
 import ssl
 import socket
 import OpenSSL.crypto as crypto
-import os
 import sys
 import time
-import yaml
-from dotenv import load_dotenv
 
-load_dotenv()
+from ssl_utils import get_config, get_splunk_hec_config, set_logging
 
 
-def get_config():
-    """Load config"""
-    try:
-        with open("config.yaml", "r", encoding="utf-8") as ymlconfig:
-            cfg = yaml.safe_load(ymlconfig)
-            return cfg.items()
-    except FileNotFoundError:
-        logging.error("Config file not found")
-        sys.exit()
+def send2Splunk(event: dict, splunk_config: tuple[str, dict], splunk_hec: dict) -> None:
+    url = splunk_hec.get("url")
+    token = splunk_hec.get("token")
 
-
-def send2Splunk(event, splunk_config):
-    url = os.getenv("HEC_ENDPOINT")
-    token = os.getenv("HEC_TOKEN")
-    # url = splunk_config[1].get("hec_url")
-    # token = splunk_config[1].get("hec_token")
     index = splunk_config[1].get("index", "main")
     source = splunk_config[1].get("source", "ssl_tester")
     sourcetype = splunk_config[1].get("sourcetype", "ssl_tester:json")
-    if not url or not token:
-        logging.error("HEC URL or Token not found in config file")
-        return None
 
-    HEC_URL = f"http://{url}/services/collector/event"
-    AUTH = {"Authorization": f"Splunk {token}"}
+    hec_url = f"http://{url}/services/collector/event"
+    auth_header = {"Authorization": f"Splunk {token}"}
 
     payload = {
         "time": int(time.time()),
@@ -52,7 +34,7 @@ def send2Splunk(event, splunk_config):
     payloadstr = json.dumps(payload)
     try:
         response = requests.post(
-            HEC_URL, headers=AUTH, data=payloadstr, verify=False, timeout=10
+            hec_url, headers=auth_header, data=payloadstr, verify=False, timeout=10
         )
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -60,7 +42,7 @@ def send2Splunk(event, splunk_config):
         sys.exit()
 
 
-def verify_ssl_certificate(hostname, port, annotation):
+def verify_ssl_certificate(hostname: str, port: int, annotation: str) -> dict:
     context = ssl.create_default_context()
     try:
         with socket.create_connection((hostname, port), timeout=10) as sock:
@@ -68,7 +50,7 @@ def verify_ssl_certificate(hostname, port, annotation):
                 ssock.do_handshake()
                 cert = ssock.getpeercert(True)
                 x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
-                print("Certificate is valid.")
+
                 cert_subject = crypto.X509Name(x509.get_subject()).get_components()
                 c_subject = [
                     ({str(k, encoding="utf-8"): str(v, encoding="utf-8")})
@@ -146,20 +128,18 @@ def verify_ssl_certificate(hostname, port, annotation):
     except ssl.SSLError as e:
         data = {"hostname": hostname, "message": str(e)}
         return data
+    except Exception as uncaught:
+        data = {"hostname": hostname, "message": str(uncaught)}
+        return data
 
 
 if __name__ == "__main__":
-    # Set logging parameters
+    # Load config
     logger, splunk, ssltester = get_config()
-    logpath = logger[1]["path"]
-    logfile = f"{logpath}/sslTester_errors.log"
-    logging.basicConfig(
-        filename=logfile,
-        filemode="w",
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-    )
+    set_logging(logger)
 
+    # Load Splunk HEC parameters
+    splunk_hec = get_splunk_hec_config()
     endpoints = ssltester[1]["endpoints"]
 
     if not endpoints:
@@ -168,7 +148,7 @@ if __name__ == "__main__":
 
     for entry in endpoints:
         endpoint = entry.get("endpoint")
-        port = entry.get("port", "443")
+        port = entry.get("port", 443)
         annotation = entry.get("annotation", "")
         verify_response = verify_ssl_certificate(endpoint, port, annotation)
-        send2Splunk(verify_response, splunk)
+        send2Splunk(verify_response, splunk, splunk_hec)

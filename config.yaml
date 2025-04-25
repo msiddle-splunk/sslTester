@@ -8,6 +8,6 @@ splunk:
 
 ssltester:
     endpoints:
-        - endpoint: ''
-          port: 8080
-          annotation: 'Test'
+#        - endpoint: ''
+#          port: 8080
+#          annotation: 'Test'
