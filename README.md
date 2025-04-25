@@ -14,7 +14,9 @@ The script requires two configurations:
     -   HEC_TOKEN
 
 -   config.yaml
-    -   Logging path for errors
+    -   Logging path
+        -   default path is /tmp/sslTester\_{date}.log
+        -   If no config.yaml is found, an error will be logged to /tmp/sslTester\_{date}.log
     -   Splunk metadata (index, source, sourcetype)
     -   Endpoints to test (endpoint, port, annotation)
 
